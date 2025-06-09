@@ -110,3 +110,6 @@ FastAPI/
   - `date`: 相关日期
   - `description`: 电影描述
   - `event`: 相关事件说明 
+  - `key`: 图片资源的 key
+
+  source venv/bin/activate && python main.py

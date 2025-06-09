@@ -16,6 +16,7 @@ class Movie(BaseModel):
     date: str
     description: str
     event: str
+    key: str
 
 # 根路径
 @app.get("/")
