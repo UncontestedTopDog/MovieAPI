@@ -103,4 +103,4 @@ async def get_movies_by_rating(min_rating: float = 0.0, max_rating: float = 10.0
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=50001) 
+    uvicorn.run(app, host="0.0.0.0", port=50001) 
