@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日电影推荐</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 30px;
+        }
+
+        .date-info {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .day-count {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .movie-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .movie-poster {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .movie-info {
+            padding: 30px;
+            text-align: left;
+        }
+
+        .movie-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .movie-original-title {
+            font-size: 18px;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+
+        .movie-rating {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .movie-description {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .movie-event {
+            font-size: 14px;
+            color: #888;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .movie-link {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: background 0.3s ease;
+        }
+
+        .movie-link:hover {
+            background: #5a67d8;
+        }
+
+        .loading {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .error {
+            color: #e53e3e;
+            font-size: 18px;
+            padding: 20px;
+            background: #fed7d7;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>每日电影推荐</h1>
+            <div class="date-info">今天是 <span id="currentDate"></span></div>
+            <div class="day-count">一年中的第 <span id="dayOfYear"></span> 天</div>
+        </div>
+        
+        <div id="movieContent" class="loading">
+            正在加载今日电影...
+        </div>
+    </div>
+
+    <script>
+        // 计算一年中的第几天
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
+
+        // 格式化日期
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}年${month}月${day}日`;
+        }
+
+        // 加载电影数据
+        async function loadMovieData() {
+            try {
+                const today = new Date();
+                const dayOfYear = getDayOfYear(today);
+                
+                // 更新日期信息
+                document.getElementById('currentDate').textContent = formatDate(today);
+                document.getElementById('dayOfYear').textContent = dayOfYear;
+                
+                // 从接口获取对应的电影数据
+                const response = await fetch(`http://47.97.26.191:50001/movies/${dayOfYear}`);
+                if (!response.ok) {
+                    throw new Error('无法加载电影数据');
+                }
+                const movie = await response.json();
+                
+                if (!movie) {
+                    throw new Error(`没有找到第${dayOfYear}天的电影数据`);
+                }
+                
+                // 显示电影信息
+                displayMovie(movie);
+                
+            } catch (error) {
+                console.error('加载电影数据失败:', error);
+                document.getElementById('movieContent').innerHTML = 
+                    `<div class="error">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 显示电影信息
+        function displayMovie(movie) {
+            // 使用多个代理服务来绕过防盗链
+            const proxyServices = [
+                'https://images.weserv.nl/?url=',
+                'https://cors-anywhere.herokuapp.com/',
+                'https://api.allorigins.win/raw?url='
+            ];
+            
+            const originalImageUrl = `https://img9.doubanio.com/view/photo/l/public/${movie.key}.webp`;
+            const imageUrl = `${proxyServices[0]}${encodeURIComponent(originalImageUrl)}`;
+            
+            const movieHtml = `
+                <div class="movie-card">
+                    <img src="${imageUrl}" alt="${movie.title}" class="movie-poster" 
+                         onerror="handleImageError(this, '${movie.key}', '${movie.title}')">
+                    <div class="movie-info">
+                        <h2 class="movie-title">${movie.title}</h2>
+                        ${movie.originalTitle ? `<div class="movie-original-title">${movie.originalTitle}</div>` : ''}
+                        <div class="movie-rating">豆瓣评分: ${movie.rating}</div>
+                        <div class="movie-description">${movie.description}</div>
+                        ${movie.event ? `<div class="movie-event"><strong>特殊日期:</strong> ${movie.event}</div>` : ''}
+                        <a href="${movie.link}" target="_blank" class="movie-link">查看详情</a>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('movieContent').innerHTML = movieHtml;
+        }
+
+        // 处理图片加载错误
+        function handleImageError(img, key, title) {
+            const proxyServices = [
+                'https://images.weserv.nl/?url=',
+                'https://cors-anywhere.herokuapp.com/',
+                'https://api.allorigins.win/raw?url='
+            ];
+            
+            const originalImageUrl = `https://img9.doubanio.com/view/photo/l/public/${key}.webp`;
+            
+            // 如果是第一个代理失败，尝试第二个
+            if (img.src.includes('weserv.nl')) {
+                img.src = `${proxyServices[1]}${originalImageUrl}`;
+            }
+            // 如果第二个也失败，尝试第三个
+            else if (img.src.includes('cors-anywhere')) {
+                img.src = `${proxyServices[2]}${encodeURIComponent(originalImageUrl)}`;
+            }
+            // 如果都失败了，显示占位图片
+            else {
+                img.src = `https://via.placeholder.com/400x600/667eea/ffffff?text=${encodeURIComponent(title)}`;
+                img.style.backgroundColor = '#f8f9fa';
+            }
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', loadMovieData);
+    </script>
+</body>
+</html> 
