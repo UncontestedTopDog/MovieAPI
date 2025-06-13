@@ -7,7 +7,26 @@ import os
 app = FastAPI(title="电影数据 API", description="基于 FastAPI 的电影数据查询服务", version="1.0.0")
 
 # 数据模型
+class MovieInfo(BaseModel):
+    title: str
+    originalTitle: str
+    link: str
+    rating: float
+    description: str
+    event: str
+    key: str
+
+class MovieEntry(BaseModel):
+    id: int
+    date: str
+    month: str
+    day: str
+    lunar: str
+    week: str
+    movie: Optional[MovieInfo] = None
+
 class Movie(BaseModel):
+    """为了保持API兼容性的简化电影模型"""
     id: int
     title: str
     originalTitle: str
@@ -24,18 +43,66 @@ async def read_root():
     return {"message": "欢迎使用 FastAPI 电影 API！", "status": "运行中", "description": "电影数据 API 服务"}
 
 # 读取电影数据的辅助函数
-def load_movies() -> List[Movie]:
-    """从 movies_2025.json 文件读取电影数据"""
+def load_movie_entries() -> List[MovieEntry]:
+    """从 movies_2025.json 文件读取原始电影数据"""
     try:
         with open("movies_2025.json", "r", encoding="utf-8") as file:
             data = json.load(file)
-            return [Movie(**movie) for movie in data]
+            return [MovieEntry(**entry) for entry in data]
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="电影数据文件未找到")
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="电影数据文件格式错误")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"读取电影数据时发生错误: {str(e)}")
+
+def load_movies() -> List[Movie]:
+    """转换为简化的Movie对象列表，过滤掉movie为null的记录"""
+    entries = load_movie_entries()
+    movies = []
+    
+    for entry in entries:
+        if entry.movie is not None:  # 只处理有电影信息的记录
+            movie = Movie(
+                id=entry.id,
+                title=entry.movie.title,
+                originalTitle=entry.movie.originalTitle,
+                link=entry.movie.link,
+                rating=entry.movie.rating,
+                date=entry.date,
+                description=entry.movie.description,
+                event=entry.movie.event,
+                key=entry.movie.key
+            )
+            movies.append(movie)
+    
+    return movies
+
+# 获取完整的电影条目（包含日期信息）
+@app.get("/entries/", response_model=List[MovieEntry])
+async def get_all_entries(skip: int = 0, limit: int = 100):
+    """获取所有电影条目（包含完整的日期信息），支持分页"""
+    entries = load_movie_entries()
+    
+    if skip < 0:
+        skip = 0
+    if limit <= 0:
+        limit = 100
+    
+    paginated_entries = entries[skip:skip + limit]
+    return paginated_entries
+
+# 根据日期获取电影条目
+@app.get("/entries/date/{date}", response_model=MovieEntry)
+async def get_entry_by_date(date: str):
+    """根据日期获取电影条目信息"""
+    entries = load_movie_entries()
+    
+    for entry in entries:
+        if entry.date == date:
+            return entry
+    
+    raise HTTPException(status_code=404, detail=f"未找到日期为 {date} 的电影条目")
 
 # 根据ID获取电影信息
 @app.get("/movies/{movie_id}", response_model=Movie)
@@ -101,6 +168,19 @@ async def get_movies_by_rating(min_rating: float = 0.0, max_rating: float = 10.0
     
     return filtered_movies[:limit]
 
+# 根据月份获取电影条目
+@app.get("/entries/month/{month}", response_model=List[MovieEntry])
+async def get_entries_by_month(month: str, limit: int = 50):
+    """根据月份获取电影条目"""
+    entries = load_movie_entries()
+    
+    matched_entries = [
+        entry for entry in entries 
+        if entry.month.startswith(month) or month in entry.month
+    ]
+    
+    return matched_entries[:limit]
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=50001) 
+    uvicorn.run(app, host="127.0.0.1", port=8000) 
